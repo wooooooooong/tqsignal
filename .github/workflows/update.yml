@@ -1,0 +1,47 @@
+name: tq-signal update
+
+on:
+  schedule:
+    # 한국시간 06:37 / 07:07 / 07:37 / 08:07 (화~토) — 지연 대비 여러 번
+    - cron: "37 21 * * 1-5"
+    - cron: "7 22 * * 1-5"
+    - cron: "37 22 * * 1-5"
+    - cron: "7 23 * * 1-5"
+    # 백업 — 한국시간 11:13
+    - cron: "13 2 * * 2-6"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-signal
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: 데이터 수집 및 신호 판정
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/update.py
+
+      - name: 변경사항 커밋
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data.json state.json
+          if git diff --staged --quiet; then
+            echo "변경 없음"
+          else
+            git commit -m "데이터 갱신: $(date -u +%Y-%m-%d)"
+            git push
+          fi
